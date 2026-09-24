@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Казино</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#0a100e; --panel:#121b17; --panel2:#18241f; --line:#243630;
+    --felt:#0e4a35; --felt2:#083325;
+    --gold:#f2c14e; --gold2:#c99526;
+    --red:#d63c3c; --black:#23272b; --green:#17a05a;
+    --text:#eef4f0; --muted:#89a298;
+    --r:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+  body{min-height:100vh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  button:disabled{opacity:.45;cursor:default}
+  [hidden]{display:none!important}
+
+  /* header */
+  .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(10,16,14,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .ava{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#2a1d00;flex:none}
+  .who{flex:1;min-width:0}
+  .who .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .who .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bal{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .bal b{color:var(--gold);font-size:16px}
+  .bal.bump{animation:bump .5s}
+  @keyframes bump{40%{transform:scale(1.12)}}
+  .bonus{padding:7px 10px;border-radius:99px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#2a1d00;font-weight:700;font-size:13px;white-space:nowrap}
+  .bonus.wait{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+
+  main{padding:14px 16px;max-width:520px;margin:0 auto}
+  .tab{display:none}
+  .tab.active{display:block;animation:fade .25s}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}}
+  h2{margin:0 0 12px;font-size:20px}
+  .muted{color:var(--muted)}
+
+  /* nav */
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:rgba(12,19,16,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+  .nav button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;color:var(--muted);font-size:11px}
+  .nav button span{font-size:22px;line-height:1}
+  .nav button.on{color:var(--gold);background:var(--panel2)}
+
+  /* common controls */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+  .row{display:flex;gap:8px;align-items:center}
+  .btn{flex:1;padding:13px 10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-weight:600}
+  .btn.primary{background:linear-gradient(180deg,#ffd463,var(--gold2));border:0;color:#2a1d00;font-weight:800;letter-spacing:.3px;box-shadow:0 4px 14px rgba(242,193,78,.25)}
+  .btn.green{background:var(--green);border:0}
+  .btn:active:not(:disabled){transform:scale(.97)}
+  .betbox{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:5px}
+  .betbox input{flex:1;min-width:0;width:60px;background:none;border:0;color:var(--gold);font:700 17px/1 inherit;text-align:center;outline:none;font-variant-numeric:tabular-nums}
+  .betbox button{padding:8px 10px;border-radius:9px;background:var(--panel);font-size:13px;font-weight:700;color:var(--muted)}
+  .label{font-size:12px;color:var(--muted);margin:12px 2px 6px;text-transform:uppercase;letter-spacing:.6px}
+
+  /* roulette */
+  .wheel-wrap{position:relative;width:min(78vw,290px);aspect-ratio:1;margin:4px auto 10px}
+  #wheel{width:100%;height:100%;transition:transform 4.5s cubic-bezier(.15,.7,.1,1);filter:drop-shadow(0 8px 24px rgba(0,0,0,.5))}
+  .pk.red{fill:var(--red)} .pk.black{fill:var(--black)} .pk.green{fill:var(--green)}
+  .pk{stroke:#c99526;stroke-width:.8}
+  .pkt{fill:#fff;font-size:11px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+  .pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid var(--gold);z-index:2;filter:drop-shadow(0 2px 3px rgba(0,0,0,.6))}
+  .hub{position:absolute;inset:32%;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#2b3a33,#0d1512);border:3px solid var(--gold2);box-shadow:inset 0 0 20px rgba(0,0,0,.7)}
+  .hub div{font-size:34px;font-weight:800}
+  .hub .red{color:#ff6b6b}.hub .green{color:#39d98a}.hub .black{color:#fff}
+  .hist{display:flex;gap:5px;justify-content:center;min-height:26px;margin-bottom:10px;flex-wrap:wrap}
+  .hist i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700}
+  .hist i.red{background:var(--red)} .hist i.black{background:var(--black);border:1px solid #3a4046} .hist i.green{background:var(--green)}
+  .chips{display:flex;gap:8px;justify-content:center;margin-bottom:10px}
+  .chip{width:46px;height:46px;border-radius:50%;font-weight:800;font-size:13px;display:grid;place-items:center;border:3px dashed rgba(255,255,255,.55);box-shadow:0 2px 6px rgba(0,0,0,.4);transition:transform .15s}
+  .chip.on{transform:translateY(-5px) scale(1.08);box-shadow:0 0 0 3px var(--gold),0 6px 12px rgba(0,0,0,.5)}
+  .c10{background:#5b6b73}.c50{background:#c0392b}.c100{background:#1f7a4d}.c500{background:#303f9f}.c1000{background:#8e44ad}
+  .board{background:radial-gradient(ellipse at top,var(--felt),var(--felt2));border:1px solid #1b6b50;border-radius:var(--r);padding:8px;display:grid;gap:5px}
+  .nums{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+  .bc{position:relative;height:40px;border-radius:8px;font-weight:700;font-size:14px;border:1px solid rgba(255,255,255,.12)}
+  .bc.red{background:var(--red)} .bc.black{background:var(--black)} .bc.green{background:var(--green)}
+  .bc.out{background:rgba(0,0,0,.25);font-size:13px}
+  .bc.win{animation:winflash 1.2s 2}
+  @keyframes winflash{50%{box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}}
+  .bc .stake{position:absolute;top:-6px;right:-4px;min-width:22px;height:22px;padding:0 5px;border-radius:99px;background:var(--gold);color:#2a1d00;font-size:10px;font-weight:800;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.4);z-index:1}
+  .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+  .g6{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+  .bc.zero{height:36px}
+
+  /* blackjack */
+  .table{background:radial-gradient(ellipse at 50% 40%,var(--felt),var(--felt2));border:1px solid #1b6b50;border-radius:22px;padding:16px 12px;min-height:330px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:inset 0 0 40px rgba(0,0,0,.5)}
+  .hlabel{text-align:center;font-size:13px;color:#b9d6c8;margin:4px 0}
+  .hlabel b{display:inline-block;min-width:28px;padding:1px 8px;border-radius:99px;background:rgba(0,0,0,.35);color:#fff;margin-left:4px}
+  .hand{display:flex;justify-content:center;min-height:96px;padding:4px 0}
+  .card{position:relative;width:64px;height:92px;border-radius:9px;background:#fdfdfb;color:#1b1b1b;box-shadow:0 4px 10px rgba(0,0,0,.45);margin-left:-18px;flex:none}
+  .card:first-child{margin-left:0}
+  .card .cr{position:absolute;top:5px;left:7px;font-weight:800;font-size:17px;line-height:1}
+  .card .cr.b{top:auto;left:auto;bottom:5px;right:7px;transform:rotate(180deg)}
+  .card .cs{position:absolute;inset:0;display:grid;place-items:center;font-size:30px}
+  .card.red{color:#d02b2b}
+  .card.back{background:repeating-linear-gradient(45deg,#7d1f1f 0 6px,#962828 6px 12px);border:3px solid #fdfdfb}
+  .card.deal{animation:deal .38s both}
+  @keyframes deal{from{opacity:0;transform:translate(40px,-60px) rotate(12deg)}}
+  .bjmsg{text-align:center;font-weight:800;font-size:18px;min-height:30px;padding:4px;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .bjmsg.win{color:var(--gold)} .bjmsg.lose{color:#ff8a8a}
+
+  /* mines */
+  .minfo{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+  .minfo div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .minfo small{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .minfo b{font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;padding:10px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line)}
+  .tile{aspect-ratio:1;border-radius:11px;background:linear-gradient(180deg,#2a3b34,#1c2a24);border-bottom:3px solid #0e1714;font-size:26px;display:grid;place-items:center;transition:transform .12s}
+  .grid.live .tile:not(.open):active{transform:scale(.92)}
+  .grid:not(.live) .tile:not(.open){opacity:.8}
+  .tile.open{animation:flip .3s}
+  .tile.gem{background:radial-gradient(circle,#1d6b4d,#123d2e);border-color:#0a2a1f}
+  .tile.bomb{background:radial-gradient(circle,#5a2323,#2e1414);border-color:#1d0b0b}
+  .tile.boom{background:radial-gradient(circle,#ff5a3c,#8a1d1d);animation:shake .45s}
+  .tile.dim{opacity:.55}
+  @keyframes flip{from{transform:rotateY(90deg)}}
+  @keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+  input[type=range]{width:100%;accent-color:var(--gold)}
+  .mc{display:flex;justify-content:space-between;align-items:baseline}
+  .mc b{color:var(--gold);font-size:18px}
+
+  /* top */
+  .lb{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+  .lb li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+  .lb li.me{border-color:var(--gold2);background:#1d2418}
+  .lb .pos{width:28px;text-align:center;font-weight:800;color:var(--muted)}
+  .lb .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lb .am{font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+  .promo{margin-top:14px;padding:14px;border-radius:var(--r);background:linear-gradient(135deg,#1c2b24,#15201b);border:1px solid var(--line)}
+  .promo .em{font-size:26px;letter-spacing:4px}
+
+  #toast{position:fixed;left:50%;top:70px;transform:translate(-50%,-20px);opacity:0;z-index:50;padding:10px 16px;border-radius:12px;background:#223029;border:1px solid var(--line);font-weight:600;transition:.25s;pointer-events:none;max-width:88vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #toast.win{background:#2c2710;border-color:var(--gold2);color:var(--gold)}
+  #toast.err{background:#321818;border-color:#6b2a2a;color:#ffb3b3}
+
+  #gate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--bg);text-align:center;padding:24px}
+  #gate .big{font-size:56px;margin-bottom:8px}
+  .spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--gold);animation:rot 0.8s linear infinite;margin:0 auto}
+  @keyframes rot{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="gate"><div><div class="spin" id="gateSpin"></div><div id="gateMsg" class="muted" style="margin-top:12px">Загрузка…</div></div></div>
+
+<header class="top">
+  <div class="ava" id="ava">?</div>
+  <div class="who"><div class="name" id="uname">Игрок</div><div class="sub">виртуальные монеты</div></div>
+  <div class="bal" id="balBox">🪙 <b id="bal">0</b></div>
+  <button class="bonus" id="bonusBtn">🎁 Бонус</button>
+</header>
+
+<main>
+  <!-- ─────────── РУЛЕТКА ─────────── -->
+  <section class="tab active" id="tab-roulette">
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <svg id="wheel" viewBox="-150 -150 300 300"></svg>
+      <div class="hub"><div id="rNum">🎡</div></div>
+    </div>
+    <div class="hist" id="rHist"></div>
+    <div class="chips" id="chips">
+      <button class="chip c10" data-c="10">10</button>
+      <button class="chip c50" data-c="50">50</button>
+      <button class="chip c100 on" data-c="100">100</button>
+      <button class="chip c500" data-c="500">500</button>
+      <button class="chip c1000" data-c="1000">1K</button>
+    </div>
+    <div class="board" id="board">
+      <button class="bc green zero" data-t="number" data-v="0">0</button>
+      <div class="nums" id="nums"></div>
+      <div class="g3">
+        <button class="bc out" data-t="dozen" data-v="1">1–12</button>
+        <button class="bc out" data-t="dozen" data-v="2">13–24</button>
+        <button class="bc out" data-t="dozen" data-v="3">25–36</button>
+      </div>
+      <div class="g6">
+        <button class="bc out" data-t="low">1–18</button>
+        <button class="bc out" data-t="even">Чёт</button>
+        <button class="bc red" data-t="red">◆</button>
+        <button class="bc black" data-t="black">◆</button>
+        <button class="bc out" data-t="odd">Нечет</button>
+        <button class="bc out" data-t="high">19–36</button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="rClear" style="flex:.6">Очистить</button>
+      <button class="btn primary" id="rSpin">КРУТИТЬ</button>
+    </div>
+    <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Число ×36 · дюжина ×3 · цвет/чёт/половина ×2. Ставки остаются на столе — жми «Крутить» ещё раз.</p>
+  </section>
+
+  <!-- ─────────── БЛЭКДЖЕК ─────────── -->
+  <section class="tab" id="tab-bj">
+    <div class="table">
+      <div>
+        <div class="hlabel">Дилер <b id="dTot">–</b></div>
+        <div class="hand" id="dHand"></div>
+      </div>
+      <div class="bjmsg" id="bjMsg">Сделай ставку</div>
+      <div>
+        <div class="hand" id="pHand"></div>
+        <div class="hlabel">Ты <b id="pTot">–</b></div>
+      </div>
+    </div>
+    <div id="bjBet">
+      <div class="label">Ставка</div>
+      <div class="betbox" id="bjBox"><button data-d="min">MIN</button><button data-d="half">½</button><input inputmode="numeric"><button data-d="double">×2</button><button data-d="max">MAX</button></div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="bjDeal">РАЗДАТЬ</button></div>
+    </div>
+    <div id="bjActs" class="row" style="margin-top:12px" hidden>
+      <button class="btn green" id="bjHit">Ещё</button>
+      <button class="btn primary" id="bjStand">Хватит</button>
+      <button class="btn" id="bjDouble">×2</button>
+    </div>
+    <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Блэкджек платит 3:2 · дилер берёт до 17 · удвоение на первых двух картах</p>
+  </section>
+
+  <!-- ─────────── МИНЫ ─────────── -->
+  <section class="tab" id="tab-mines">
+    <div class="minfo">
+      <div><small>Множитель</small><b id="mMult">x1.00</b></div>
+      <div><small>Следующая клетка</small><b id="mNext">—</b></div>
+    </div>
+    <div class="grid" id="mGrid"></div>
+    <div id="mSetup">
+      <div class="label">Мины</div>
+      <div class="panel">
+        <div class="mc"><span>Мин на поле: <b id="mCount">3</b></span><span class="muted" style="font-size:13px">1-я клетка: <span id="mFirst">x1.07</span></span></div>
+        <input type="range" id="mRange" min="1" max="24" value="3">
+      </div>
+      <div class="label">Ставка</div>
+      <div class="betbox" id="mBox"><button data-d="min">MIN</button><button data-d="half">½</button><input inputmode="numeric"><button data-d="double">×2</button><button data-d="max">MAX</button></div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="mStart">ИГРАТЬ</button></div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="mCash" hidden>Забрать</button></div>
+  </section>
+
+  <!-- ─────────── ТОП ─────────── -->
+  <section class="tab" id="tab-top">
+    <h2>🏆 Топ игроков</h2>
+    <p class="muted" id="myRank" style="margin:-6px 0 12px"></p>
+    <ul class="lb" id="lb"></ul>
+    <div class="promo">
+      <div class="em">🎲🎯🏀⚽</div>
+      <div style="font-weight:700;margin:6px 0 4px">Ещё игры — прямо в чате</div>
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Кости против бота, дартс, баскетбол и футбол на анимированных эмодзи Telegram.</div>
+      <button class="btn" id="toChat" style="width:100%">Вернуться в чат</button>
+    </div>
+  </section>
+</main>
+
+<nav class="nav" id="nav">
+  <button class="on" data-tab="roulette"><span>🎡</span>Рулетка</button>
+  <button data-tab="bj"><span>🃏</span>Блэкджек</button>
+  <button data-tab="mines"><span>💣</span>Мины</button>
+  <button data-tab="top"><span>🏆</span>Топ</button>
+</nav>
+
+<div id="toast"></div>
+
+<script>
+// ⚙️ Вставь сюда адрес своей Edge Function:
+const API_URL = "https://otkdoulqqzghcdzsurmj.supabase.co/functions/v1/casino";
+
+const tg = window.Telegram && window.Telegram.WebApp;
+try { tg.ready(); tg.expand(); tg.setHeaderColor("#0a100e"); tg.setBackgroundColor("#0a100e"); } catch (e) {}
+
+const $ = (s) => document.querySelector(s);
+const fmt = (n) => Math.round(n).toLocaleString("ru-RU");
+const S = { balance: 0, shown: 0, minBet: 10, maxBet: 100000, busy: false, bonusAt: 0, bonusAmount: 500, userId: 0 };
+
+const hap = {
+  tap: () => { try { tg.HapticFeedback.impactOccurred("light"); } catch (e) {} },
+  win: () => { try { tg.HapticFeedback.notificationOccurred("success"); } catch (e) {} },
+  lose: () => { try { tg.HapticFeedback.notificationOccurred("error"); } catch (e) {} },
+};
+
+async function api(action, data = {}) {
+  let r, d;
+  try {
+    r = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, initData: (tg && tg.initData) || "", ...data }),
+    });
+    d = await r.json();
+  } catch (e) { throw new Error("Сервер недоступен"); }
+  if (d.error) throw new Error(d.error);
+  return d;
+}
+
+let toastT;
+function toast(msg, kind = "") {
+  const t = $("#toast");
+  t.textContent = msg; t.className = "show " + kind;
+  clearTimeout(toastT); toastT = setTimeout(() => (t.className = kind), 2400);
+}
+
+function setBalance(n, animate = true) {
+  S.balance = n;
+  const from = S.shown, to = n, el = $("#bal");
+  if (!animate || from === to) { S.shown = to; el.textContent = fmt(to); return; }
+  $("#balBox").classList.remove("bump"); void $("#balBox").offsetWidth; $("#balBox").classList.add("bump");
+  const t0 = performance.now(), dur = 600;
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    S.shown = Math.round(from + (to - from) * e); el.textContent = fmt(S.shown);
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function betBox(el, def) {
+  const inp = el.querySelector("input");
+  inp.value = def;
+  el.addEventListener("click", (e) => {
+    const d = e.target.dataset.d; if (!d) return;
+    let v = Math.floor(+inp.value) || 0;
+    if (d === "half") v = Math.floor(v / 2);
+    if (d === "double") v = v * 2;
+    if (d === "max") v = Math.min(S.balance, S.maxBet);
+    if (d === "min") v = S.minBet;
+    inp.value = Math.max(S.minBet, Math.min(v, S.maxBet)); hap.tap();
+  });
+  inp.addEventListener("change", () => { inp.value = Math.max(S.minBet, Math.min(Math.floor(+inp.value) || S.minBet, S.maxBet)); });
+  return () => Math.floor(+inp.value) || 0;
+}
+
+async function guard(fn) {
+  if (S.busy) return; S.busy = true;
+  try { await fn(); } catch (e) { toast(e.message, "err"); hap.lose(); } finally { S.busy = false; }
+}
+
+/* ─────────── tabs ─────────── */
+$("#nav").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll(".nav button").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x.id === "tab-" + b.dataset.tab));
+  hap.tap(); window.scrollTo(0, 0);
+  if (b.dataset.tab === "top") loadTop();
+});
+
+/* ─────────── bonus ─────────── */
+function renderBonus() {
+  const b = $("#bonusBtn"), left = Math.max(0, Math.ceil((S.bonusAt - Date.now()) / 1000));
+  if (!left) { b.className = "bonus"; b.textContent = "🎁 +" + S.bonusAmount; return; }
+  const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60);
+  b.className = "bonus wait"; b.textContent = "⏳ " + (h ? h + "ч" + (m ? " " + m + "м" : "") : Math.max(1, m) + "м");
+}
+setInterval(renderBonus, 30000);
+$("#bonusBtn").onclick = () => guard(async () => {
+  if (S.bonusAt > Date.now()) { toast("Бонус ещё не готов ⏳"); return; }
+  const d = await api("bonus");
+  setBalance(d.balance); S.bonusAt = Date.now() + d.bonusWait * 1000; renderBonus();
+  toast("🎁 +" + fmt(d.amount) + " монет!", "win"); hap.win();
+});
+
+/* ─────────── roulette ─────────── */
+const ORDER = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+const RED = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+const colorOf = (n) => (n === 0 ? "green" : RED.has(n) ? "red" : "black");
+(function buildWheel() {
+  const step = 360 / 37, R = 146, r = 100, rad = (d) => (d * Math.PI) / 180;
+  const p = (ra, a) => (ra * Math.sin(a)).toFixed(2) + "," + (-ra * Math.cos(a)).toFixed(2);
+  let h = '<circle r="149" fill="#3b2a12"/><circle r="147" fill="#c99526"/>';
+  ORDER.forEach((n, i) => {
+    const a0 = rad(i * step - step / 2), a1 = rad(i * step + step / 2);
+    h += `<path class="pk ${colorOf(n)}" d="M${p(r, a0)} L${p(R, a0)} A${R},${R} 0 0 1 ${p(R, a1)} L${p(r, a1)} A${r},${r} 0 0 0 ${p(r, a0)}Z"/>`;
+    h += `<text class="pkt" transform="rotate(${(i * step).toFixed(2)}) translate(0,-127)">${n}</text>`;
+  });
+  h += '<circle r="100" fill="#1a120a" stroke="#c99526" stroke-width="2"/>';
+  for (let i = 0; i < 8; i++) h += `<line x1="0" y1="-60" x2="0" y2="-98" stroke="#c99526" stroke-width="3" transform="rotate(${i * 45})"/>`;
+  $("#wheel").innerHTML = h;
+  const nums = $("#nums");
+  for (let n = 1; n <= 36; n++) nums.insertAdjacentHTML("beforeend", `<button class="bc ${colorOf(n)}" data-t="number" data-v="${n}">${n}</button>`);
+})();
+
+let chip = 100, rBets = {}, wheelRot = 0;
+const betKey = (t, v) => t + ":" + (v ?? "");
+$("#chips").onclick = (e) => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  chip = +c.dataset.c; document.querySelectorAll(".chip").forEach((x) => x.classList.toggle("on", x === c)); hap.tap();
+};
+function rTotal() { return Object.values(rBets).reduce((a, b) => a + b, 0); }
+function renderBets() {
+  document.querySelectorAll("#board .bc").forEach((b) => {
+    const k = betKey(b.dataset.t, b.dataset.v), amt = rBets[k];
+    let s = b.querySelector(".stake");
+    if (amt) { if (!s) { s = document.createElement("span"); s.className = "stake"; b.appendChild(s); } s.textContent = amt >= 1000 ? +(amt / 1000).toFixed(1) + "K" : amt; }
+    else if (s) s.remove();
+  });
+  const t = rTotal();
+  $("#rSpin").textContent = t ? "КРУТИТЬ · " + fmt(t) : "КРУТИТЬ";
+}
+$("#board").onclick = (e) => {
+  const b = e.target.closest(".bc"); if (!b || S.busy) return;
+  const k = betKey(b.dataset.t, b.dataset.v);
+  if (rTotal() + chip > S.maxBet) { toast("Максимум на спин — " + fmt(S.maxBet), "err"); return; }
+  rBets[k] = (rBets[k] || 0) + chip; renderBets(); hap.tap();
+};
+$("#rClear").onclick = () => { if (S.busy) return; rBets = {}; renderBets(); };
+$("#rSpin").onclick = () => guard(async () => {
+  const bets = Object.entries(rBets).map(([k, amount]) => {
+    const [type, v] = k.split(":"); return v === "" ? { type, amount } : { type, value: +v, amount };
+  });
+  if (!bets.length) { toast("Поставь фишки на стол 👆"); return; }
+  const total = rTotal();
+  if (total > S.balance) { toast("Недостаточно монет", "err"); return; }
+  const d = await api("roulette", { bets });
+  setBalance(S.balance - total);
+  document.querySelectorAll(".bc.win").forEach((x) => x.classList.remove("win"));
+  $("#rNum").textContent = "…"; $("#rNum").className = "";
+  const step = 360 / 37, target = -ORDER.indexOf(d.number) * step;
+  const cur = ((wheelRot % 360) + 360) % 360;
+  wheelRot += 360 * 5 + ((((target - cur) % 360) + 360) % 360);
+  $("#wheel").style.transform = `rotate(${wheelRot}deg)`;
+  await new Promise((r) => setTimeout(r, 4600));
+  $("#rNum").textContent = d.number; $("#rNum").className = d.color;
+  $("#rHist").insertAdjacentHTML("afterbegin", `<i class="${d.color}">${d.number}</i>`);
+  while ($("#rHist").children.length > 10) $("#rHist").lastChild.remove();
+  d.wins.forEach((w) => { const el = document.querySelector(`#board .bc[data-t="${w.type}"]${w.value !== undefined ? `[data-v="${w.value}"]` : ""}`); if (el) el.classList.add("win"); });
+  setBalance(d.balance);
+  if (d.payout > 0) { toast(`${d.number} ${d.color === "red" ? "🔴" : d.color === "black" ? "⚫" : "🟢"} · выигрыш ${fmt(d.payout)} 🪙`, "win"); hap.win(); }
+  else { toast(`${d.number} — мимо`); hap.lose(); }
+});
+
+/* ─────────── blackjack ─────────── */
+const bjBet = betBox($("#bjBox"), 100);
+let bjPrev = { p: 0, d: 0, hidden: false };
+function cardHtml(c, isNew, delay) {
+  const st = isNew ? ` style="animation-delay:${delay}s"` : "";
+  if (!c) return `<div class="card back${isNew ? " deal" : ""}"${st}></div>`;
+  const red = c.s === "♥" || c.s === "♦";
+  return `<div class="card${red ? " red" : ""}${isNew ? " deal" : ""}"${st}><span class="cr">${c.r}</span><span class="cs">${c.s}</span><span class="cr b">${c.r}</span></div>`;
+}
+const BJ_TEXT = { blackjack: ["Блэкджек! 🎉", "win"], win: ["Победа!", "win"], push: ["Ничья — ставка возвращена", ""], lose: ["Дилер выиграл", "lose"], bust: ["Перебор 💥", "lose"] };
+function renderBJ(g) {
+  if (!g) {
+    $("#pHand").innerHTML = ""; $("#dHand").innerHTML = ""; $("#pTot").textContent = "–"; $("#dTot").textContent = "–";
+    $("#bjMsg").textContent = "Сделай ставку"; $("#bjMsg").className = "bjmsg";
+    $("#bjBet").hidden = false; $("#bjActs").hidden = true; return;
+  }
+  let k = 0;
+  $("#pHand").innerHTML = g.player.map((c, i) => { const n = i >= bjPrev.p; return cardHtml(c, n, n ? 0.15 * k++ : 0); }).join("");
+  $("#dHand").innerHTML = g.dealer.map((c, i) => { const n = i >= bjPrev.d || (i === 1 && bjPrev.hidden && g.finished); return cardHtml(c, n, n ? 0.15 * k++ : 0); }).join("");
+  bjPrev = { p: g.player.length, d: g.dealer.length, hidden: !g.finished };
+  $("#pTot").textContent = g.playerTotal; $("#dTot").textContent = g.dealerTotal;
+  if (g.finished) {
+    let [txt, cls] = BJ_TEXT[g.result] || ["", ""];
+    if (g.result === "win" && g.dealerTotal > 21) txt = "Дилер перебрал!";
+    const delta = g.payout - g.bet;
+    $("#bjMsg").textContent = txt + (delta > 0 ? ` +${fmt(delta)}` : delta < 0 && g.result !== "push" ? ` −${fmt(g.bet)}` : "");
+    $("#bjMsg").className = "bjmsg " + cls;
+    $("#bjBet").hidden = false; $("#bjActs").hidden = true;
+    cls === "win" ? hap.win() : cls === "lose" ? hap.lose() : 0;
+  } else {
+    $("#bjMsg").textContent = "Ставка " + fmt(g.bet) + " 🪙"; $("#bjMsg").className = "bjmsg";
+    $("#bjBet").hidden = true; $("#bjActs").hidden = false;
+    $("#bjDouble").disabled = !g.canDouble || S.balance < g.bet;
+  }
+}
+$("#bjDeal").onclick = () => guard(async () => {
+  bjPrev = { p: 0, d: 0, hidden: false };
+  const d = await api("bj_start", { bet: bjBet() });
+  renderBJ(d.game); setBalance(d.balance);
+});
+for (const [id, act] of [["#bjHit", "bj_hit"], ["#bjStand", "bj_stand"], ["#bjDouble", "bj_double"]])
+  $(id).onclick = () => guard(async () => { hap.tap(); const d = await api(act); renderBJ(d.game); setBalance(d.balance); });
+
+/* ─────────── mines ─────────── */
+const mBet = betBox($("#mBox"), 100);
+const mGrid = $("#mGrid");
+for (let i = 0; i < 25; i++) mGrid.insertAdjacentHTML("beforeend", `<button class="tile" data-i="${i}"></button>`);
+function mult(m, k) { let x = 0.97; for (let i = 0; i < k; i++) x *= (25 - i) / (25 - m - i); return Math.floor(x * 100) / 100; }
+function updRange() { const m = +$("#mRange").value; $("#mCount").textContent = m; $("#mFirst").textContent = "x" + mult(m, 1).toFixed(2); }
+$("#mRange").oninput = updRange; updRange();
+let mGame = null;
+function renderMines(g) {
+  mGame = g && !g.finished ? g : null;
+  const tiles = mGrid.children;
+  for (let i = 0; i < 25; i++) {
+    const t = tiles[i]; t.className = "tile"; t.textContent = "";
+    if (!g) continue;
+    if (g.revealed.includes(i)) { t.className = "tile open gem"; t.textContent = "💎"; }
+    else if (g.finished && g.mines && g.mines.includes(i)) { t.className = "tile open " + (g.hit === i ? "boom" : "bomb"); t.textContent = "💣"; }
+    else if (g.finished) t.classList.add("dim");
+  }
+  mGrid.classList.toggle("live", !!mGame);
+  $("#mMult").textContent = "x" + (g ? g.multiplier : 1).toFixed(2);
+  $("#mNext").textContent = g && !g.finished && g.next ? "x" + g.next.toFixed(2) : "—";
+  $("#mSetup").hidden = !!mGame; $("#mCash").hidden = !mGame;
+  if (mGame) { $("#mCash").disabled = !g.cashout; $("#mCash").textContent = g.cashout ? "ЗАБРАТЬ " + fmt(g.cashout) + " 🪙" : "Открой клетку"; }
+}
+$("#mStart").onclick = () => guard(async () => {
+  const d = await api("mines_start", { bet: mBet(), mines: +$("#mRange").value });
+  renderMines(d.game); setBalance(d.balance); hap.tap();
+});
+mGrid.onclick = (e) => {
+  const t = e.target.closest(".tile"); if (!t || !mGame || t.classList.contains("open")) return;
+  guard(async () => {
+    const d = await api("mines_reveal", { cell: +t.dataset.i });
+    renderMines(d.game); setBalance(d.balance);
+    if (d.game.finished && d.game.result === "lose") { hap.lose(); toast("💥 Бум! Ставка сгорела", "err"); }
+    else if (d.game.finished) { hap.win(); toast("Поле пройдено! +" + fmt(d.game.payout) + " 🪙", "win"); }
+    else hap.tap();
+  });
+};
+$("#mCash").onclick = () => guard(async () => {
+  const d = await api("mines_cashout");
+  renderMines(d.game); setBalance(d.balance); hap.win();
+  toast("💰 Забрал " + fmt(d.game.payout) + " 🪙 (x" + d.game.multiplier.toFixed(2) + ")", "win");
+});
+
+/* ─────────── top ─────────── */
+async function loadTop() {
+  try {
+    const d = await api("top");
+    const medals = ["🥇", "🥈", "🥉"];
+    $("#lb").innerHTML = d.top.map((r, i) => {
+      const nm = r.name.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      return `<li class="${r.id === S.userId ? "me" : ""}"><span class="pos">${medals[i] || i + 1}</span><span class="nm">${nm}</span><span class="am">${fmt(r.balance)} 🪙</span></li>`;
+    }).join("") || '<li class="muted">Пока никого</li>';
+    $("#myRank").textContent = "Твоё место: " + d.rank;
+  } catch (e) { toast(e.message, "err"); }
+}
+$("#toChat").onclick = () => { try { tg.close(); } catch (e) {} };
+
+/* ─────────── start ─────────── */
+(async function init() {
+  if (!tg || !tg.initData) {
+    $("#gateSpin").hidden = true;
+    $("#gateMsg").innerHTML = '<div class="big">🎰</div><b style="color:var(--text);font-size:18px">Открой казино через бота</b><br><br>Эта страница работает только внутри Telegram.';
+    return;
+  }
+  try {
+    const d = await api("me");
+    S.userId = d.user.id; S.minBet = d.minBet; S.maxBet = d.maxBet; S.bonusAmount = d.bonusAmount;
+    S.bonusAt = Date.now() + d.bonusWait * 1000;
+    $("#uname").textContent = d.user.name; $("#ava").textContent = (d.user.name || "?").trim()[0].toUpperCase();
+    setBalance(d.balance, false); renderBonus();
+    if (d.blackjack) { renderBJ(d.blackjack); }
+    if (d.mines) renderMines(d.mines); else renderMines(null);
+    $("#gate").hidden = true;
+  } catch (e) {
+    $("#gateSpin").hidden = true;
+    $("#gateMsg").innerHTML = '<div class="big">⚠️</div>' + e.message + '<br><br><button class="btn" onclick="location.reload()">Повторить</button>';
+  }
+})();
+</script>
+</body>
+</html>
