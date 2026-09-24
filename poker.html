@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Покер — Емеля777</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{--felt:#0f5c3a;--felt2:#0a3f28;--gold:#f5c542;--bg:#060a08;--text:#f2f5f3;--muted:#9fb3a8;--red:#e0433b;--btn:#1e2b25}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  body{display:flex;flex-direction:column;overscroll-behavior:none}
+  button{font:inherit;border:0;border-radius:12px;padding:12px 10px;color:var(--text);background:var(--btn);font-weight:600;cursor:pointer}
+  button:disabled{opacity:.4}
+  button.gold{background:var(--gold);color:#222}
+  button.red{background:#7a2320}
+  input{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid #2c3d35;background:#131f19;color:var(--text);text-align:center}
+  .hide{display:none!important}
+  #toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:12px;z-index:9;font-size:14px;max-width:90%;text-align:center}
+
+  /* Лобби */
+  #lobby{padding:20px 16px;display:flex;flex-direction:column;gap:14px;max-width:420px;margin:0 auto;width:100%}
+  #lobby h1{margin:6px 0 0;text-align:center;font-size:26px}
+  .sub{color:var(--muted);text-align:center;font-size:14px}
+  .card-box{background:#121d18;border:1px solid #22332b;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .card-box h3{margin:0;font-size:16px}
+  .row{display:flex;gap:8px}.row>*{flex:1}
+  .chips{display:flex;gap:6px}.chips button{flex:1;padding:8px 0;font-size:13px}
+  #codeInput{text-transform:uppercase;letter-spacing:6px;font-size:22px;font-weight:700}
+
+  /* Стол */
+  #table{flex:1;display:flex;flex-direction:column;min-height:0}
+  #topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:13px;color:var(--muted)}
+  #topbar b{color:var(--gold);letter-spacing:2px}
+  #topbar button{padding:6px 10px;font-size:12px}
+  #felt{flex:1;margin:0 8px;border-radius:120px/90px;background:radial-gradient(ellipse at center,var(--felt) 0%,var(--felt2) 80%);border:6px solid #3b2a17;box-shadow:inset 0 0 30px #0008;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:14px 8px;min-height:360px;position:relative}
+  .seat{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .plate{background:#000a;border-radius:12px;padding:6px 14px;text-align:center;min-width:120px;border:2px solid transparent;transition:border-color .2s}
+  .plate.turn{border-color:var(--gold);box-shadow:0 0 12px #f5c54288}
+  .plate .nm{font-weight:700;font-size:14px}
+  .plate .st{color:var(--gold);font-size:13px}
+  .plate .tag{font-size:11px;color:var(--muted)}
+  .hand{display:flex;gap:6px;min-height:66px}
+  .bet{min-height:22px;font-size:13px;background:#0006;border-radius:10px;padding:2px 10px;color:var(--gold)}
+  .bet:empty{background:none}
+  .dbtn{display:inline-block;background:#fff;color:#111;border-radius:50%;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:800;margin-left:6px;text-align:center}
+  #center{display:flex;flex-direction:column;align-items:center;gap:8px}
+  #board{display:flex;gap:5px;min-height:66px}
+  #pot{font-weight:700;color:var(--gold);font-size:15px}
+  #result{font-size:14px;text-align:center;background:#000b;padding:6px 12px;border-radius:10px;max-width:280px}
+
+  .c{width:46px;height:66px;border-radius:7px;background:#fff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;box-shadow:0 2px 4px #0006;line-height:1;animation:pop .25s ease}
+  .c .r{font-size:22px}.c .s{font-size:20px}
+  .c.red{color:#d42a2a}
+  .c.back{background:repeating-linear-gradient(45deg,#8e1b1b 0 6px,#b52a2a 6px 12px);border:3px solid #fff}
+  .c.slot{background:#ffffff14;box-shadow:none;animation:none}
+  .c.win{outline:3px solid var(--gold)}
+  .c.dim{opacity:.45}
+  .me .c{width:54px;height:76px}.me .c .r{font-size:26px}
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+
+  #log{font-size:12px;color:var(--muted);padding:6px 14px;height:38px;overflow:hidden;text-align:center}
+  #actions{padding:8px 10px calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;background:#0e1814;border-top:1px solid #1d2c25}
+  #raiseBox{display:flex;flex-direction:column;gap:8px}
+  #raiseBox input[type=range]{padding:0;border:0;background:none;accent-color:var(--gold)}
+  .qa{display:flex;gap:6px}.qa button{flex:1;padding:7px 0;font-size:12px}
+  .main3{display:flex;gap:8px}.main3 button{flex:1;font-size:15px}
+  #waitMsg{text-align:center;color:var(--muted);padding:10px;font-size:14px}
+</style>
+</head>
+<body>
+
+<div id="toast" class="hide"></div>
+
+<!-- ЛОББИ -->
+<div id="lobby">
+  <button id="homeBtn" style="align-self:flex-start;padding:8px 12px;font-size:13px">← Казино</button>
+  <h1>♠ Техасский холдем</h1>
+  <div class="sub">1 на 1 с другом · <span id="balance">…</span></div>
+
+  <div class="card-box">
+    <h3>Создать стол</h3>
+    <div class="sub" style="text-align:left">Бай-ин (фишки на стол):</div>
+    <input id="buyIn" type="number" inputmode="numeric" value="1000" min="100">
+    <div class="chips">
+      <button data-b="500">500</button><button data-b="1000">1000</button><button data-b="5000">5000</button><button data-b="10000">10000</button>
+    </div>
+    <div class="sub" style="text-align:left" id="blindsHint"></div>
+    <button class="gold" id="createBtn">Создать стол</button>
+  </div>
+
+  <div class="card-box">
+    <h3>Войти по коду</h3>
+    <input id="codeInput" maxlength="5" placeholder="КОД" autocomplete="off">
+    <button id="joinBtn">Войти</button>
+  </div>
+  <div class="sub">Правила: безлимитный холдем, блайнды 1%/2% от бай-ина. Уходишь со стола — фишки возвращаются монетами на баланс.</div>
+</div>
+
+<!-- СТОЛ -->
+<div id="table" class="hide">
+  <div id="topbar">
+    <button id="leaveBtn">← Выйти</button>
+    <span>Стол <b id="tCode"></b> · <span id="tBlinds"></span></span>
+    <button id="shareBtn">Позвать</button>
+  </div>
+
+  <div id="felt">
+    <div class="seat opp">
+      <div class="plate" id="oppPlate"><div class="nm" id="oppName">—</div><div class="st" id="oppStack"></div><div class="tag" id="oppTag"></div></div>
+      <div class="hand" id="oppHand"></div>
+      <div class="bet" id="oppBet"></div>
+    </div>
+
+    <div id="center">
+      <div id="pot"></div>
+      <div id="board"></div>
+      <div id="result" class="hide"></div>
+    </div>
+
+    <div class="seat me">
+      <div class="bet" id="myBet"></div>
+      <div class="hand" id="myHand"></div>
+      <div class="plate" id="myPlate"><div class="nm" id="myName">Ты</div><div class="st" id="myStack"></div><div class="tag" id="myTag"></div></div>
+    </div>
+  </div>
+
+  <div id="log"></div>
+
+  <div id="actions">
+    <div id="waitMsg"></div>
+    <div id="betControls" class="hide">
+      <div id="raiseBox" class="hide">
+        <div class="row" style="align-items:center"><input type="range" id="raiseRange"><input type="number" id="raiseNum" inputmode="numeric" style="flex:0 0 96px;padding:8px"></div>
+        <div class="qa"><button data-q="0.5">½ банка</button><button data-q="0.75">¾</button><button data-q="1">Банк</button><button data-q="all">Олл-ин</button></div>
+      </div>
+      <div class="main3">
+        <button class="red" id="foldBtn">Фолд</button>
+        <button id="ccBtn">Чек</button>
+        <button class="gold" id="raiseBtn">Рейз</button>
+      </div>
+    </div>
+    <div id="nextControls" class="hide main3">
+      <button class="gold" id="nextBtn">Следующая раздача</button>
+      <button class="gold hide" id="rebuyBtn">Ребай</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== НАСТРОЙКИ =====
+// Адрес Edge Function (Supabase → Edge Functions → poker → URL)
+const API_URL = "https://otkdoulqqzghcdzsurmj.supabase.co/functions/v1/poker";
+// Ссылка на Mini App бота для приглашений (необязательно), напр. "https://t.me/Emelya777bot/app"
+const APP_LINK = "";
+// ======================
+
+const tg = window.Telegram?.WebApp;
+tg?.ready(); tg?.expand();
+try { tg?.setHeaderColor?.("#060a08"); tg?.setBackgroundColor?.("#060a08"); } catch(e){}
+const $ = id => document.getElementById(id);
+const SUIT = {s:"♠",h:"♥",d:"♦",c:"♣"};
+const RANK = r => r === "T" ? "10" : r;
+
+let T = null, code = null, pollTimer = null, busy = false, raiseOpen = false, lastTurnKey = "";
+
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.remove("hide"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.add("hide"),2600); }
+function haptic(type){ try{ tg?.HapticFeedback?.[type==="turn"?"notificationOccurred":"impactOccurred"](type==="turn"?"success":"light"); }catch(e){} }
+function store(k,v){ try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){} }
+function load(k){ try{ return localStorage.getItem(k);}catch(e){ return null; } }
+
+async function api(action, data={}){
+  const r = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ action, initData: tg?.initData || "", code, ...data }) });
+  const j = await r.json().catch(()=>({error:"Нет ответа от сервера"}));
+  if (!r.ok || j.error) throw new Error(j.error || "Ошибка");
+  return j;
+}
+
+// ---------- Лобби ----------
+function fmt(n){ return Number(n).toLocaleString("ru-RU"); }
+function updHint(){ const b=Math.floor(+$("buyIn").value||0); const bb=Math.max(2,2*Math.floor(b/100)); $("blindsHint").textContent = b>=100 ? `Блайнды ${bb/2}/${bb}` : "Минимум 100"; }
+$("buyIn").oninput = updHint; updHint();
+document.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>{ $("buyIn").value=b.dataset.b; updHint(); });
+
+async function loadBalance(){
+  try{ const {balance} = await api("balance"); $("balance").textContent = balance==null ? "фишки бесплатно" : `баланс: ${fmt(balance)} 🪙`; }
+  catch(e){ $("balance").textContent = e.message; }
+}
+
+$("createBtn").onclick = async () => {
+  if (busy) return; busy = true;
+  try { code=null; const {table} = await api("create", { buyIn: +$("buyIn").value }); enterTable(table); }
+  catch(e){ toast(e.message); } finally { busy=false; }
+};
+$("joinBtn").onclick = () => joinByCode($("codeInput").value);
+$("codeInput").onkeydown = e => { if(e.key==="Enter") joinByCode(e.target.value); };
+
+async function joinByCode(c){
+  c = String(c||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if (c.length < 5) return toast("Введи код из 5 символов");
+  if (busy) return; busy = true;
+  try { code=c; const {table} = await api("join"); enterTable(table); }
+  catch(e){ code=null; toast(e.message); } finally { busy=false; }
+}
+
+function enterTable(table){
+  code = table.code; store("poker_code", code);
+  $("lobby").classList.add("hide"); $("table").classList.remove("hide");
+  render(table);
+  clearInterval(pollTimer); pollTimer = setInterval(poll, 1500);
+}
+function exitToLobby(){
+  clearInterval(pollTimer); code=null; T=null; store("poker_code", null);
+  $("table").classList.add("hide"); $("lobby").classList.remove("hide");
+  loadBalance();
+}
+async function poll(){
+  if (busy || !code) return;
+  try { const {table} = await api("state"); if (!busy) render(table); }
+  catch(e){ if (/не найден/.test(e.message)) { toast("Стол закрыт"); exitToLobby(); } }
+}
+
+// ---------- Стол ----------
+function cardEl(c, opts={}){
+  const d = document.createElement("div");
+  if (c === undefined) { d.className="c slot"; return d; }
+  if (c === null) { d.className="c back"; return d; }
+  d.className = "c" + ("hd".includes(c[1]) ? " red" : "") + (opts.win?" win":"") + (opts.dim?" dim":"");
+  d.innerHTML = `<span class="r">${RANK(c[0])}</span><span class="s">${SUIT[c[1]]}</span>`;
+  return d;
+}
+function fillCards(el, cards, key, winSet){
+  const k = key + JSON.stringify(cards) + (winSet?[...winSet].join():"");
+  if (el._k === k) return; el._k = k;
+  el.innerHTML = ""; cards.forEach(c => el.appendChild(cardEl(c, winSet ? {win: winSet.has(c), dim: c && !winSet.has(c)} : {})));
+}
+
+function render(t){
+  T = t;
+  const me = t.me, opp = me === 0 ? 1 : 0;
+  const P = t.players[me], O = t.players[opp];
+  $("tCode").textContent = t.code;
+  $("tBlinds").textContent = `${t.sb}/${t.bb}`;
+  $("shareBtn").classList.toggle("hide", t.players.length >= 2);
+
+  // выигрышные карты для подсветки
+  let winSet = null;
+  if (t.result?.type === "showdown") winSet = new Set(t.result.winners.flatMap(w => t.result.hands[w].cards));
+
+  // я
+  $("myName").innerHTML = (P?.name || "Ты") + (t.dealer===me && t.handNo ? '<span class="dbtn">D</span>' : "");
+  $("myStack").textContent = P ? fmt(P.stack) + " 🪙" : "";
+  $("myTag").textContent = P?.folded ? "фолд" : P?.allIn ? "олл-ин" : "";
+  $("myBet").textContent = P?.bet ? fmt(P.bet) : "";
+  fillCards($("myHand"), P?.hole?.length ? P.hole : [], "m", winSet);
+  $("myPlate").classList.toggle("turn", t.status==="playing" && t.toAct===me);
+
+  // соперник
+  if (O) {
+    $("oppName").innerHTML = O.name + (t.dealer===opp && t.handNo ? '<span class="dbtn">D</span>' : "");
+    $("oppStack").textContent = fmt(O.stack) + " 🪙";
+    $("oppTag").textContent = O.folded ? "фолд" : O.allIn ? "олл-ин" : "";
+    $("oppBet").textContent = O.bet ? fmt(O.bet) : "";
+    fillCards($("oppHand"), O.hole?.length ? O.hole : [], "o", winSet);
+  } else {
+    $("oppName").textContent = "Ждём соперника…"; $("oppStack").textContent = ""; $("oppTag").textContent = `Код стола: ${t.code}`;
+    $("oppBet").textContent = ""; fillCards($("oppHand"), [], "o");
+  }
+  $("oppPlate").classList.toggle("turn", t.status==="playing" && t.toAct===opp);
+
+  // центр
+  const board = [...t.board]; while (board.length < 5 && t.handNo) board.push(undefined);
+  fillCards($("board"), board, "b", winSet);
+  const betsSum = t.players.reduce((a,p)=>a+p.bet,0);
+  $("pot").textContent = (t.pot + betsSum) ? `Банк: ${fmt(t.pot + betsSum)}` : "";
+  const res = $("result");
+  if (t.result && t.status !== "playing") {
+    const r = t.result, iWon = r.winners.includes(me), split = r.winners.length > 1;
+    let txt = split ? `Ничья! Банк ${fmt(r.amount)} поделён` : iWon ? `🏆 Ты выиграл ${fmt(r.amount)}` : `${t.players[r.winners[0]].name} выиграл ${fmt(r.amount)}`;
+    if (r.type === "showdown") txt += ` — ${r.hands[r.winners[0]].name}`;
+    else txt += iWon ? " (соперник сбросил)" : " (ты сбросил)";
+    if (r.type==="showdown" && !split) txt += `<br><small style="color:#9fb3a8">у проигравшего: ${r.hands[r.winners[0]===0?1:0].name}</small>`;
+    res.innerHTML = txt; res.classList.remove("hide");
+    if (pop.last !== t.handNo) { pop.last = t.handNo; haptic(iWon?"turn":"tap"); }
+  } else res.classList.add("hide");
+
+  $("log").textContent = t.log.slice(-2).join(" · ");
+
+  // действия
+  const myTurn = t.status === "playing" && t.toAct === me;
+  $("betControls").classList.toggle("hide", !myTurn);
+  const between = t.status !== "playing" && t.players.length === 2;
+  $("nextControls").classList.toggle("hide", !between);
+  let wait = "";
+  if (t.players.length < 2) wait = `Отправь другу код <b style="color:#f5c542;letter-spacing:2px">${t.code}</b> — игра начнётся, как только он сядет`;
+  else if (t.status === "playing" && !myTurn) wait = `Ходит ${O?.name || "соперник"}…`;
+  $("waitMsg").innerHTML = wait; $("waitMsg").classList.toggle("hide", !wait);
+
+  if (between) {
+    const broke = P && P.stack <= 0, oppBroke = O && O.stack <= 0;
+    $("rebuyBtn").classList.toggle("hide", !broke);
+    $("rebuyBtn").textContent = `Ребай ${fmt(t.buyIn)}`;
+    $("nextBtn").classList.toggle("hide", broke);
+    $("nextBtn").disabled = oppBroke;
+    $("nextBtn").textContent = oppBroke ? "У соперника 0 — ждём ребай" : "Следующая раздача";
+  }
+
+  if (myTurn) {
+    const key = t.handNo + ":" + t.street + ":" + t.currentBet + ":" + P.bet;
+    if (key !== lastTurnKey) { lastTurnKey = key; haptic("turn"); setupBetting(t, P, O); }
+  } else { raiseOpen = false; $("raiseBox").classList.add("hide"); lastTurnKey = ""; }
+}
+function pop(){}
+
+function setupBetting(t, P, O){
+  const toCall = t.currentBet - P.bet;
+  const maxTo = P.bet + P.stack;
+  $("ccBtn").textContent = toCall > 0 ? `Колл ${fmt(Math.min(toCall, P.stack))}` : "Чек";
+  const canRaise = !O.allIn && maxTo > t.currentBet && !(toCall >= P.stack);
+  $("raiseBtn").disabled = !canRaise;
+  const minTo = Math.min(t.currentBet + t.minRaise, maxTo);
+  const R = $("raiseRange"), N = $("raiseNum");
+  R.min = N.min = minTo; R.max = N.max = maxTo; R.step = 1;
+  R.value = N.value = minTo;
+  raiseOpen = false; $("raiseBox").classList.add("hide");
+  updRaiseLabel();
+}
+function updRaiseLabel(){
+  const t=T, P=t.players[t.me], v=+$("raiseNum").value, maxTo=P.bet+P.stack;
+  const word = t.currentBet === 0 ? "Бет" : "Рейз до";
+  $("raiseBtn").textContent = raiseOpen ? (v >= maxTo ? "Олл-ин " + fmt(v) : `${word} ${fmt(v)}`) : (t.currentBet===0 ? "Бет" : "Рейз");
+}
+$("raiseRange").oninput = e => { $("raiseNum").value = e.target.value; updRaiseLabel(); };
+$("raiseNum").oninput = e => { $("raiseRange").value = e.target.value; updRaiseLabel(); };
+document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => {
+  const t=T, P=t.players[t.me], maxTo=P.bet+P.stack, min=+$("raiseRange").min;
+  let v;
+  if (b.dataset.q === "all") v = maxTo;
+  else { const pot = t.pot + t.players.reduce((a,p)=>a+p.bet,0) + (t.currentBet - P.bet); v = t.currentBet + Math.round(pot * +b.dataset.q); }
+  v = Math.max(min, Math.min(maxTo, v));
+  $("raiseRange").value = $("raiseNum").value = v; updRaiseLabel();
+});
+
+async function doAct(move, amount){
+  if (busy) return; busy = true;
+  $("betControls").classList.add("hide");
+  try { const {table} = await api("act", { move, amount }); lastTurnKey=""; render(table); haptic("tap"); }
+  catch(e){ toast(e.message); lastTurnKey=""; poll(); } finally { busy=false; }
+}
+$("foldBtn").onclick = () => doAct("fold");
+$("ccBtn").onclick = () => { const P=T.players[T.me]; doAct(T.currentBet - P.bet > 0 ? "call" : "check"); };
+$("raiseBtn").onclick = () => {
+  if (!raiseOpen) { raiseOpen = true; $("raiseBox").classList.remove("hide"); updRaiseLabel(); return; }
+  const v = +$("raiseNum").value, P=T.players[T.me];
+  doAct(v >= P.bet + P.stack ? "allin" : "raise", v);
+};
+$("nextBtn").onclick = async () => {
+  if (busy) return; busy = true;
+  try { const {table} = await api("next"); render(table); } catch(e){ toast(e.message); } finally { busy=false; }
+};
+$("rebuyBtn").onclick = async () => {
+  if (busy) return; busy = true;
+  try { const {table} = await api("rebuy"); render(table); } catch(e){ toast(e.message); } finally { busy=false; }
+};
+
+async function leave(){
+  const doIt = async () => {
+    busy = true;
+    try { const r = await api("leave"); toast(r.cashout ? `Возвращено ${fmt(r.cashout)} 🪙` : "Ты вышел"); exitToLobby(); }
+    catch(e){ toast(e.message); } finally { busy=false; }
+  };
+  const msg = T?.status === "playing" ? "Выйти? Текущая раздача будет сброшена (фолд)." : "Выйти со стола? Фишки вернутся на баланс.";
+  if (tg?.showConfirm) tg.showConfirm(msg, ok => ok && doIt()); else if (confirm(msg)) doIt();
+}
+$("leaveBtn").onclick = leave;
+const goHome = () => { location.href = "index.html"; };
+$("homeBtn").onclick = goHome;
+tg?.BackButton?.show();
+tg?.BackButton?.onClick(() => { if (code) leave(); else goHome(); });
+
+$("shareBtn").onclick = () => {
+  const link = APP_LINK ? `${APP_LINK}?startapp=poker_${code}` : "";
+  const text = `Го в покер 1 на 1! Код стола: ${code}` + (link ? "" : " — открой @Emelya777bot → 🎰 Казино → ♠️ Покер и введи код");
+  const url = `https://t.me/share/url?url=${encodeURIComponent(link || "https://t.me/Emelya777bot")}&text=${encodeURIComponent(text)}`;
+  if (tg?.openTelegramLink) tg.openTelegramLink(url); else navigator.clipboard?.writeText(code).then(()=>toast("Код скопирован"));
+};
+
+// ---------- Старт ----------
+(async function init(){
+  loadBalance();
+  const sp = tg?.initDataUnsafe?.start_param || new URLSearchParams(location.search).get("code") || "";
+  const fromLink = sp.replace(/^poker_/, "");
+  const saved = load("poker_code");
+  if (fromLink && fromLink.length >= 5) return joinByCode(fromLink);
+  if (saved) {
+    code = saved;
+    try { const {table} = await api("state"); if (table.me >= 0) return enterTable(table); } catch(e){}
+    code = null; store("poker_code", null);
+  }
+})();
+</script>
+</body>
+</html>

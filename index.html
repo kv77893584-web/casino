@@ -47,7 +47,7 @@ h2{margin:0 0 12px;font-size:22px}
 .hint{font-size:12px;text-align:center;margin:12px 0 0;color:var(--muted)}
 
 /* nav */
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(0deg,rgba(6,10,8,.98),rgba(10,16,13,.92));backdrop-filter:blur(12px);border-top:1px solid var(--line)}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(0deg,rgba(6,10,8,.98),rgba(10,16,13,.92));backdrop-filter:blur(12px);border-top:1px solid var(--line)}
 .nav button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;border-radius:14px;color:var(--muted);font-size:11px;font-weight:600;transition:.2s}
 .nav button span{font-size:23px;line-height:1;transition:transform .25s cubic-bezier(.3,1.7,.5,1)}
 .nav button.on{color:var(--gold);background:linear-gradient(180deg,rgba(255,209,102,.16),rgba(255,209,102,.03));box-shadow:inset 0 1px 0 rgba(255,209,102,.35)}
@@ -291,6 +291,7 @@ input[type=range]{width:100%;accent-color:var(--gold);height:28px}
   <button class="on" data-tab="roulette"><span>🎡</span>Рулетка</button>
   <button data-tab="bj"><span>🃏</span>Блэкджек</button>
   <button data-tab="mines"><span>💣</span>Мины</button>
+  <button data-go="poker.html"><span>♠️</span>Покер</button>
   <button data-tab="top"><span>🏆</span>Топ</button>
 </nav>
 
@@ -457,6 +458,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /* ─────────── вкладки ─────────── */
 $("#nav").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.go) { location.href = b.dataset.go; return; }
   document.querySelectorAll(".nav button").forEach((x) => x.classList.toggle("on", x === b));
   document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x.id === "tab-" + b.dataset.tab));
   hap.tap(); SND.tap(); window.scrollTo(0, 0);
